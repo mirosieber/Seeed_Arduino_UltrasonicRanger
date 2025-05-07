@@ -1,45 +1,66 @@
 #include "PulseInInterrupt.h"
+#include <driver/gpio.h>
 
-volatile unsigned long PulseInInterrupt::_pulseStart = 0;
-volatile unsigned long PulseInInterrupt::_pulseEnd = 0;
-volatile bool PulseInInterrupt::_pulseComplete = false;
-volatile bool PulseInInterrupt::_waitingForStart = true;
-PulseInInterrupt* PulseInInterrupt::_instance = nullptr;
+bool PulseInInterrupt::_isrServiceInstalled = false;
 
-PulseInInterrupt::PulseInInterrupt() : _pin(255) {}  // 255 = ungültiger Pin
+PulseInInterrupt::PulseInInterrupt() 
+    : _pin(255), _pulseStart(0), _pulseEnd(0), _pulseComplete(false), _waitingForStart(true) {}
 
-void PulseInInterrupt::begin(uint8_t pin) {
-    _pin = pin;
-    if (_pin == 255) return; // Pin wurde nicht gesetzt
-
-    pinMode(_pin, INPUT);
-    _instance = this;
-    attachInterrupt(digitalPinToInterrupt(_pin), isrWrapper, RISING);
+PulseInInterrupt::~PulseInInterrupt() {
+    if (_pin != 255) {
+        gpio_isr_handler_remove(static_cast<gpio_num_t>(_pin));
+        pinMode(_pin, INPUT);
+    }
 }
 
-void PulseInInterrupt::isrWrapper() {
-    if (_instance) {
-        _instance->handleInterrupt();
+void PulseInInterrupt::init(uint8_t pin) {
+    if (_pin != 255) {
+        gpio_isr_handler_remove(static_cast<gpio_num_t>(_pin));
+    }
+
+    _pin = pin;
+    pinMode(_pin, INPUT);
+
+    if (!_isrServiceInstalled) {
+        gpio_install_isr_service(0);
+        _isrServiceInstalled = true;
+    }
+
+    gpio_set_intr_type(static_cast<gpio_num_t>(_pin), GPIO_INTR_POSEDGE);
+    gpio_isr_handler_add(static_cast<gpio_num_t>(_pin), isrHandler, this);
+}
+
+void PulseInInterrupt::begin() {
+    _pulseComplete = false;
+    _waitingForStart = true;
+}
+
+void IRAM_ATTR PulseInInterrupt::isrHandler(void* arg) {
+    PulseInInterrupt* instance = static_cast<PulseInInterrupt*>(arg);
+    if (instance) {
+        instance->handleInterrupt();
     }
 }
 
 void PulseInInterrupt::handleInterrupt() {
-    if (_waitingForStart) {
+    int state = digitalRead(_pin);
+    if (state == HIGH && _waitingForStart) {
         _pulseStart = micros();
         _waitingForStart = false;
-        attachInterrupt(digitalPinToInterrupt(_pin), isrWrapper, FALLING);
-    } else {
+        gpio_set_intr_type(static_cast<gpio_num_t>(_pin), GPIO_INTR_NEGEDGE);
+    } else if (state == LOW && !_waitingForStart) {
         _pulseEnd = micros();
         _pulseComplete = true;
         _waitingForStart = true;
-        detachInterrupt(digitalPinToInterrupt(_pin));
+        gpio_set_intr_type(static_cast<gpio_num_t>(_pin), GPIO_INTR_POSEDGE);
     }
 }
 
 unsigned long PulseInInterrupt::getPulseDuration() {
     if (_pulseComplete) {
+        unsigned long duration = _pulseEnd - _pulseStart;
         _pulseComplete = false;
-        return _pulseEnd - _pulseStart;
+        return duration;
     }
     return 0;
 }

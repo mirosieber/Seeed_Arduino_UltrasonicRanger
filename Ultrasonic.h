@@ -32,6 +32,7 @@
 #define Ultrasonic_H
 
 #include "Arduino.h"
+#include "PulseInInterrupt.h"
 
 class Ultrasonic {
   public:
@@ -42,6 +43,7 @@ class Ultrasonic {
   private:
     int _pin;//pin number of Arduino that is connected with SIG pin of Ultrasonic Ranger.
     long duration(uint32_t timeout = 1000000L);
+    PulseInInterrupt pulseSensor(0);
 };
 
 #endif

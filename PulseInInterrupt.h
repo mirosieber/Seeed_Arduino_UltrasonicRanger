@@ -5,8 +5,9 @@
 
 class PulseInInterrupt {
 public:
-    PulseInInterrupt(uint8_t pin);
+    PulseInInterrupt();
 
+    void init(uint8_t pin);
     void begin();
     unsigned long getPulseDuration();
 

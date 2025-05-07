@@ -6,9 +6,15 @@ volatile bool PulseInInterrupt::_pulseComplete = false;
 volatile bool PulseInInterrupt::_waitingForStart = true;
 PulseInInterrupt* PulseInInterrupt::_instance = nullptr;
 
-PulseInInterrupt::PulseInInterrupt(uint8_t pin) : _pin(pin) {}
+PulseInInterrupt::PulseInInterrupt() : _pin(255) {}  // 255 = ungültiger Pin
+
+void PulseInInterrupt::init(uint8_t pin) {
+    _pin = pin;
+}
 
 void PulseInInterrupt::begin() {
+    if (_pin == 255) return; // Pin wurde nicht gesetzt
+
     pinMode(_pin, INPUT);
     _instance = this;
     attachInterrupt(digitalPinToInterrupt(_pin), isrWrapper, RISING);

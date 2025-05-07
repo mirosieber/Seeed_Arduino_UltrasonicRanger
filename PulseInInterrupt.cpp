@@ -8,11 +8,8 @@ PulseInInterrupt* PulseInInterrupt::_instance = nullptr;
 
 PulseInInterrupt::PulseInInterrupt() : _pin(255) {}  // 255 = ungültiger Pin
 
-void PulseInInterrupt::init(uint8_t pin) {
+void PulseInInterrupt::begin(uint8_t pin) {
     _pin = pin;
-}
-
-void PulseInInterrupt::begin() {
     if (_pin == 255) return; // Pin wurde nicht gesetzt
 
     pinMode(_pin, INPUT);
@@ -35,7 +32,7 @@ void PulseInInterrupt::handleInterrupt() {
         _pulseEnd = micros();
         _pulseComplete = true;
         _waitingForStart = true;
-        attachInterrupt(digitalPinToInterrupt(_pin), isrWrapper, RISING);
+        detachInterrupt(digitalPinToInterrupt(_pin));
     }
 }
 
